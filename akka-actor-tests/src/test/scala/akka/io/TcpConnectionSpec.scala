@@ -364,7 +364,7 @@ class TcpConnectionSpec extends AkkaSpec("""
         ConfigFactory.load(
           ConfigFactory.parseString("akka.io.tcp.direct-buffer-size = 1k")
             .withFallback(AkkaSpec.testConf))
-      override implicit def system: ActorSystem = ActorSystem("respectPullModeTest", config)
+      override lazy val system: ActorSystem = ActorSystem("respectPullModeTest", config)
 
       try run {
         val maxBufferSize = 1 * 1024
@@ -402,7 +402,7 @@ class TcpConnectionSpec extends AkkaSpec("""
 
         connectionHandler.expectMsgType[Received].data.decodeString("ASCII") should ===(vs)
       }
-      finally system.terminate()
+      finally shutdown(system)
     }
 
     "close the connection and reply with `Closed` upon reception of a `Close` command" in

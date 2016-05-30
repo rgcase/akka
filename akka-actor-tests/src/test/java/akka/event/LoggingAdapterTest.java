@@ -33,35 +33,39 @@ public class LoggingAdapterTest extends JUnitSuite {
     @Test
     public void mustFormatMessage() {
         final ActorSystem system = ActorSystem.create("test-system", config);
-        final LoggingAdapter log = Logging.getLogger(system, this);
-        new LogJavaTestKit(system) {{
-            system.eventStream().subscribe(getRef(), LogEvent.class);
-            log.error("One arg message: {}", "the arg");
-            expectLog(ErrorLevel(), "One arg message: the arg");
-
-            Throwable cause = new IllegalStateException("This state is illegal") {
-                @Override
-                public synchronized Throwable fillInStackTrace() {
-                    return this; // no stack trace
-                }
-            };
-            log.error(cause, "Two args message: {}, {}", "an arg", "another arg");
-            expectLog(ErrorLevel(), "Two args message: an arg, another arg", cause);
-
-            int[] primitiveArgs = {10, 20, 30};
-            log.warning("Args as array of primitives: {}, {}, {}", primitiveArgs);
-            expectLog(WarningLevel(), "Args as array of primitives: 10, 20, 30");
-
-            Date now = new Date();
-            UUID uuid = UUID.randomUUID();
-            Object[] objArgs = {"A String", now, uuid};
-            log.info("Args as array of objects: {}, {}, {}", objArgs);
-            expectLog(InfoLevel(), "Args as array of objects: A String, " + now.toString() + ", " + uuid.toString());
-
-            log.debug("Four args message: {}, {}, {}, {}", 1, 2, 3, 4);
-            expectLog(DebugLevel(), "Four args message: 1, 2, 3, 4");
-
-        }};
+        try {
+            final LoggingAdapter log = Logging.getLogger(system, this);
+            new LogJavaTestKit(system) {{
+                system.eventStream().subscribe(getRef(), LogEvent.class);
+                log.error("One arg message: {}", "the arg");
+                expectLog(ErrorLevel(), "One arg message: the arg");
+    
+                Throwable cause = new IllegalStateException("This state is illegal") {
+                    @Override
+                    public synchronized Throwable fillInStackTrace() {
+                        return this; // no stack trace
+                    }
+                };
+                log.error(cause, "Two args message: {}, {}", "an arg", "another arg");
+                expectLog(ErrorLevel(), "Two args message: an arg, another arg", cause);
+    
+                int[] primitiveArgs = {10, 20, 30};
+                log.warning("Args as array of primitives: {}, {}, {}", primitiveArgs);
+                expectLog(WarningLevel(), "Args as array of primitives: 10, 20, 30");
+    
+                Date now = new Date();
+                UUID uuid = UUID.randomUUID();
+                Object[] objArgs = {"A String", now, uuid};
+                log.info("Args as array of objects: {}, {}, {}", objArgs);
+                expectLog(InfoLevel(), "Args as array of objects: A String, " + now.toString() + ", " + uuid.toString());
+    
+                log.debug("Four args message: {}, {}, {}, {}", 1, 2, 3, 4);
+                expectLog(DebugLevel(), "Four args message: 1, 2, 3, 4");
+    
+            }};
+        } finally {
+            JavaTestKit.shutdownActorSystem(system);
+        }
     }
 
     @Test
@@ -131,6 +135,7 @@ public class LoggingAdapterTest extends JUnitSuite {
 
         void expectLog(final Object level, final String message, final Throwable cause, final String mdc) {
             new ExpectMsg<Void>(Duration.create(3, TimeUnit.SECONDS), "LogEvent") {
+                @Override
                 protected Void match(Object event) {
                     LogEvent log = (LogEvent) event;
                     assertEquals(message, log.message());
