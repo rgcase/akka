@@ -3,6 +3,7 @@ package akka.event;
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
+import akka.testkit.AkkaJUnitActorSystemResource;
 import akka.testkit.JavaTestKit;
 import akka.event.Logging.Error;
 import akka.event.ActorWithMDC.Log;
@@ -10,6 +11,8 @@ import static akka.event.Logging.*;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.scalatest.junit.JUnitSuite;
 import scala.concurrent.duration.Duration;
@@ -30,67 +33,72 @@ public class LoggingAdapterTest extends JUnitSuite {
             "akka.actor.serialize-messages = off"
     );
 
-    @Test
-    public void mustFormatMessage() {
-        final ActorSystem system = ActorSystem.create("test-system", config);
-        try {
-            final LoggingAdapter log = Logging.getLogger(system, this);
-            new LogJavaTestKit(system) {{
-                system.eventStream().subscribe(getRef(), LogEvent.class);
-                log.error("One arg message: {}", "the arg");
-                expectLog(ErrorLevel(), "One arg message: the arg");
-    
-                Throwable cause = new IllegalStateException("This state is illegal") {
-                    @Override
-                    public synchronized Throwable fillInStackTrace() {
-                        return this; // no stack trace
-                    }
-                };
-                log.error(cause, "Two args message: {}, {}", "an arg", "another arg");
-                expectLog(ErrorLevel(), "Two args message: an arg, another arg", cause);
-    
-                int[] primitiveArgs = {10, 20, 30};
-                log.warning("Args as array of primitives: {}, {}, {}", primitiveArgs);
-                expectLog(WarningLevel(), "Args as array of primitives: 10, 20, 30");
-    
-                Date now = new Date();
-                UUID uuid = UUID.randomUUID();
-                Object[] objArgs = {"A String", now, uuid};
-                log.info("Args as array of objects: {}, {}, {}", objArgs);
-                expectLog(InfoLevel(), "Args as array of objects: A String, " + now.toString() + ", " + uuid.toString());
-    
-                log.debug("Four args message: {}, {}, {}, {}", 1, 2, 3, 4);
-                expectLog(DebugLevel(), "Four args message: 1, 2, 3, 4");
-    
-            }};
-        } finally {
-            JavaTestKit.shutdownActorSystem(system);
-        }
+    @Rule
+    public AkkaJUnitActorSystemResource actorSystemResource = new AkkaJUnitActorSystemResource("LoggingAdapterTest");
+
+    private ActorSystem system = null;
+
+    @Before
+    public void beforeEach() {
+    system = actorSystemResource.getSystem();
     }
 
     @Test
-    public void mustCallMdcForEveryLog() throws Exception {
-        final ActorSystem system = ActorSystem.create("test-system", config);
+    public void mustFormatMessage() {
+        final LoggingAdapter log = Logging.getLogger(system, this);
         new LogJavaTestKit(system) {{
             system.eventStream().subscribe(getRef(), LogEvent.class);
-            ActorRef ref = system.actorOf(Props.create(ActorWithMDC.class));
+            log.error("One arg message: {}", "the arg");
+            expectLog(ErrorLevel(), "One arg message: the arg");
 
-            ref.tell(new Log(ErrorLevel(), "An Error"), system.deadLetters());
-            expectLog(ErrorLevel(), "An Error", "{messageLength=8}");
-            ref.tell(new Log(WarningLevel(), "A Warning"), system.deadLetters());
-            expectLog(WarningLevel(), "A Warning", "{messageLength=9}");
-            ref.tell(new Log(InfoLevel(), "Some Info"), system.deadLetters());
-            expectLog(InfoLevel(), "Some Info", "{messageLength=9}");
-            ref.tell(new Log(DebugLevel(), "No MDC for 4th call"), system.deadLetters());
-            expectLog(DebugLevel(), "No MDC for 4th call");
-            ref.tell(new Log(Logging.DebugLevel(), "And now yes, a debug with MDC"), system.deadLetters());
-            expectLog(DebugLevel(), "And now yes, a debug with MDC", "{messageLength=29}");
+            Throwable cause = new IllegalStateException("This state is illegal") {
+                @Override
+                public synchronized Throwable fillInStackTrace() {
+                    return this; // no stack trace
+                }
+            };
+            log.error(cause, "Two args message: {}, {}", "an arg", "another arg");
+            expectLog(ErrorLevel(), "Two args message: an arg, another arg", cause);
+
+            int[] primitiveArgs = {10, 20, 30};
+            log.warning("Args as array of primitives: {}, {}, {}", primitiveArgs);
+            expectLog(WarningLevel(), "Args as array of primitives: 10, 20, 30");
+
+            Date now = new Date();
+            UUID uuid = UUID.randomUUID();
+            Object[] objArgs = {"A String", now, uuid};
+            log.info("Args as array of objects: {}, {}, {}", objArgs);
+            expectLog(InfoLevel(), "Args as array of objects: A String, " + now.toString() + ", " + uuid.toString());
+
+            log.debug("Four args message: {}, {}, {}, {}", 1, 2, 3, 4);
+            expectLog(DebugLevel(), "Four args message: 1, 2, 3, 4");
+
         }};
     }
 
     @Test
+    public void mustCallMdcForEveryLog() throws Exception {
+    new LogJavaTestKit(system) {
+      {
+          system.eventStream().subscribe(getRef(), LogEvent.class);
+          ActorRef ref = system.actorOf(Props.create(ActorWithMDC.class));
+
+          ref.tell(new Log(ErrorLevel(), "An Error"), system.deadLetters());
+          expectLog(ErrorLevel(), "An Error", "{messageLength=8}");
+          ref.tell(new Log(WarningLevel(), "A Warning"), system.deadLetters());
+          expectLog(WarningLevel(), "A Warning", "{messageLength=9}");
+          ref.tell(new Log(InfoLevel(), "Some Info"), system.deadLetters());
+          expectLog(InfoLevel(), "Some Info", "{messageLength=9}");
+          ref.tell(new Log(DebugLevel(), "No MDC for 4th call"), system.deadLetters());
+          expectLog(DebugLevel(), "No MDC for 4th call");
+          ref.tell(new Log(Logging.DebugLevel(), "And now yes, a debug with MDC"), system.deadLetters());
+          expectLog(DebugLevel(), "And now yes, a debug with MDC", "{messageLength=29}");
+      }
+    };
+    }
+
+    @Test
     public void mustSupportMdcNull() throws Exception {
-        final ActorSystem system = ActorSystem.create("test-system", config);
         new LogJavaTestKit(system) {{
             system.eventStream().subscribe(getRef(), LogEvent.class);
             ActorRef ref = system.actorOf(Props.create(ActorWithMDC.class));
