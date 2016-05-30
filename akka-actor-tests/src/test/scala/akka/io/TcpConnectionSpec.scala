@@ -360,11 +360,10 @@ class TcpConnectionSpec extends AkkaSpec("""
 
     "respect pull mode" in new EstablishedConnectionTest(pullMode = true) {
       // override config to decrease default buffer size
-      val config =
-        ConfigFactory.load(
-          ConfigFactory.parseString("akka.io.tcp.direct-buffer-size = 1k")
-            .withFallback(AkkaSpec.testConf))
-      override lazy val system: ActorSystem = ActorSystem("respectPullModeTest", config)
+      def config =
+        ConfigFactory.parseString("akka.io.tcp.direct-buffer-size = 1k")
+          .withFallback(AkkaSpec.testConf)
+      override implicit lazy val system: ActorSystem = ActorSystem("respectPullModeTest", config)
 
       try run {
         val maxBufferSize = 1 * 1024

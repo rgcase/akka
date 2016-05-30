@@ -34,13 +34,14 @@ public class LoggingAdapterTest extends JUnitSuite {
     );
 
     @Rule
-    public AkkaJUnitActorSystemResource actorSystemResource = new AkkaJUnitActorSystemResource("LoggingAdapterTest");
+    public AkkaJUnitActorSystemResource actorSystemResource = 
+        new AkkaJUnitActorSystemResource("LoggingAdapterTest", config);
 
     private ActorSystem system = null;
 
     @Before
     public void beforeEach() {
-    system = actorSystemResource.getSystem();
+       system = actorSystemResource.getSystem();
     }
 
     @Test
@@ -78,23 +79,21 @@ public class LoggingAdapterTest extends JUnitSuite {
 
     @Test
     public void mustCallMdcForEveryLog() throws Exception {
-    new LogJavaTestKit(system) {
-      {
-          system.eventStream().subscribe(getRef(), LogEvent.class);
-          ActorRef ref = system.actorOf(Props.create(ActorWithMDC.class));
+        new LogJavaTestKit(system) {{
+            system.eventStream().subscribe(getRef(), LogEvent.class);
+            ActorRef ref = system.actorOf(Props.create(ActorWithMDC.class));
 
-          ref.tell(new Log(ErrorLevel(), "An Error"), system.deadLetters());
-          expectLog(ErrorLevel(), "An Error", "{messageLength=8}");
-          ref.tell(new Log(WarningLevel(), "A Warning"), system.deadLetters());
-          expectLog(WarningLevel(), "A Warning", "{messageLength=9}");
-          ref.tell(new Log(InfoLevel(), "Some Info"), system.deadLetters());
-          expectLog(InfoLevel(), "Some Info", "{messageLength=9}");
-          ref.tell(new Log(DebugLevel(), "No MDC for 4th call"), system.deadLetters());
-          expectLog(DebugLevel(), "No MDC for 4th call");
-          ref.tell(new Log(Logging.DebugLevel(), "And now yes, a debug with MDC"), system.deadLetters());
-          expectLog(DebugLevel(), "And now yes, a debug with MDC", "{messageLength=29}");
-      }
-    };
+            ref.tell(new Log(ErrorLevel(), "An Error"), system.deadLetters());
+            expectLog(ErrorLevel(), "An Error", "{messageLength=8}");
+            ref.tell(new Log(WarningLevel(), "A Warning"), system.deadLetters());
+            expectLog(WarningLevel(), "A Warning", "{messageLength=9}");
+            ref.tell(new Log(InfoLevel(), "Some Info"), system.deadLetters());
+            expectLog(InfoLevel(), "Some Info", "{messageLength=9}");
+            ref.tell(new Log(DebugLevel(), "No MDC for 4th call"), system.deadLetters());
+            expectLog(DebugLevel(), "No MDC for 4th call");
+            ref.tell(new Log(Logging.DebugLevel(), "And now yes, a debug with MDC"), system.deadLetters());
+            expectLog(DebugLevel(), "And now yes, a debug with MDC", "{messageLength=29}");
+        }};
     }
 
     @Test
