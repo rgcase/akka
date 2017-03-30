@@ -241,7 +241,7 @@ object SupervisorStrategy extends SupervisorStrategyLowPriorityImplicits {
   private[akka] def maxNrOfRetriesOption(maxNrOfRetries: Int): Option[Int] =
     if (maxNrOfRetries < 0) None else Some(maxNrOfRetries)
 
-  private[akka] val escalateDefault = (_: Any) ⇒ Escalate
+  private[akka] val escalateDefault: Decider = { case (_: Throwable) ⇒ Escalate }
 }
 
 /**
@@ -265,6 +265,13 @@ abstract class SupervisorStrategy {
    * to obtain the Directive to be applied.
    */
   def decider: Decider
+
+  /**
+   * Returns the Decider that should be apply if `decider.isDefinedAt`
+   * returns false.
+   */
+
+  private[akka] def fallback: Decider
 
   /**
    * This method is called after the child has been removed from the set of children.
@@ -293,7 +300,7 @@ abstract class SupervisorStrategy {
    * @param children is a lazy collection (a view)
    */
   def handleFailure(context: ActorContext, child: ActorRef, cause: Throwable, stats: ChildRestartStats, children: Iterable[ChildRestartStats]): Boolean = {
-    val directive = decider.applyOrElse(cause, escalateDefault)
+    val directive = decider.applyOrElse(cause, fallback)
     directive match {
       case Resume ⇒
         logFailure(context, child, cause, directive)
@@ -386,10 +393,15 @@ abstract class SupervisorStrategy {
 case class AllForOneStrategy(
   maxNrOfRetries:              Int      = -1,
   withinTimeRange:             Duration = Duration.Inf,
-  override val loggingEnabled: Boolean  = true)(val decider: SupervisorStrategy.Decider)
+  override val loggingEnabled: Boolean  = true,
+  fallbackToDefaultDecider:    Boolean  = false)(val decider: SupervisorStrategy.Decider)
   extends SupervisorStrategy {
 
   import SupervisorStrategy._
+
+  override val fallback: Decider =
+    if (fallbackToDefaultDecider) SupervisorStrategy.defaultDecider
+    else SupervisorStrategy.escalateDefault
 
   /**
    * Java API
@@ -461,8 +473,15 @@ case class AllForOneStrategy(
 case class OneForOneStrategy(
   maxNrOfRetries:              Int      = -1,
   withinTimeRange:             Duration = Duration.Inf,
-  override val loggingEnabled: Boolean  = true)(val decider: SupervisorStrategy.Decider)
+  override val loggingEnabled: Boolean  = true,
+  fallbackToDefaultDecider:    Boolean  = false)(val decider: SupervisorStrategy.Decider)
   extends SupervisorStrategy {
+
+  import SupervisorStrategy._
+
+  override val fallback: Decider =
+    if (fallbackToDefaultDecider) SupervisorStrategy.defaultDecider
+    else SupervisorStrategy.escalateDefault
 
   /**
    * Java API
